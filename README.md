@@ -1,50 +1,53 @@
-# Welcome to your Expo app 👋
+# NBK Market — Application Mobile Client
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application mobile pour les utilisateurs de NBK Market. Permet de parcourir les boutiques, rechercher des produits par catégorie et wilaya, et contacter directement les commerçants.
 
-## Get started
+## Stack technique
 
-1. Install dependencies
+- React Native 0.81.5
+- Expo SDK 54
+- Expo Router 6
+- TypeScript
 
-   ```bash
-   npm install
-   ```
+## Prérequis
 
-2. Start the app
+- Node.js (LTS)
+- Expo Go installé sur ton téléphone ([Android](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS](https://apps.apple.com/app/expo-go/id982107779))
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Installation
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Lancement
 
-## Learn more
+```bash
+npx expo start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Scanne le QR code avec Expo Go pour voir l'app sur ton téléphone.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Structure
 
-## Join the community
+```
+app/
+├── _layout.tsx    # Layout racine (Stack navigator)
+└── index.tsx      # Écran d'accueil
+src/
+├── components/    # Composants réutilisables
+├── hooks/         # Custom hooks
+├── lib/           # Utilitaires
+├── screens/       # Écrans complexes
+├── services/      # Appels API
+├── styles/        # Thème et constantes
+└── types/         # Types TypeScript
+assets/            # Images, icônes, fonts
+```
 
-Join our community of developers creating universal apps.
+## Design
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Thème : Bleu nuit (`#0B1A2E`) + blanc + accent cyan (`#4FC3F7`)
+- Navigation par onglets : Accueil, Explorer, Messages, Favoris, Profil
+- Cartes produits avec emoji, prix en DA, localisation par wilaya
+- Contact direct : appel, message, déplacement
