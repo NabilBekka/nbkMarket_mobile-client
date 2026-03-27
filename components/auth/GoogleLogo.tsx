@@ -1,36 +1,21 @@
-import { View, Text, StyleSheet } from "react-native";
+import { Image, StyleSheet } from "react-native";
+
+const GOOGLE_LOGO_URI =
+  "https://developers.google.com/identity/images/g-logo.png";
 
 export default function GoogleLogo() {
   return (
-    <View style={styles.outer}>
-      <View style={styles.inner}>
-        <Text style={styles.blue}>G</Text>
-      </View>
-    </View>
+    <Image
+      source={{ uri: GOOGLE_LOGO_URI }}
+      style={styles.logo}
+      resizeMode="contain"
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  outer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#4285F4",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  inner: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  blue: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#4285F4",
-    marginLeft: 1,
+  logo: {
+    width: 22,
+    height: 22,
   },
 });

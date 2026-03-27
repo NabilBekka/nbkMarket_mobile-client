@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, Switch,
-  KeyboardAvoidingView, Platform, StyleSheet,
+  StyleSheet,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -41,30 +41,25 @@ export default function ProfileTab() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={90}
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.bgGray }}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {view === "login" && (
-            <LoginSection
-              onSwitchRegister={() => setView("register")}
-              onSwitchForgot={() => setView("forgot")}
-            />
-          )}
-          {view === "register" && (
-            <RegisterSection onSwitchLogin={() => setView("login")} />
-          )}
-          {view === "forgot" && (
-            <ForgotSection onSwitchLogin={() => setView("login")} />
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {view === "login" && (
+          <LoginSection
+            onSwitchRegister={() => setView("register")}
+            onSwitchForgot={() => setView("forgot")}
+          />
+        )}
+        {view === "register" && (
+          <RegisterSection onSwitchLogin={() => setView("login")} />
+        )}
+        {view === "forgot" && (
+          <ForgotSection onSwitchLogin={() => setView("login")} />
+        )}
+      </ScrollView>
     </View>
   );
 }
