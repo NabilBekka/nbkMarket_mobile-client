@@ -1,22 +1,19 @@
 import { View, Text, TextInput, StyleSheet } from "react-native";
 import { colors } from "@/constants/colors";
+import { useLang } from "@/context/LangContext";
 
 export default function Header() {
+  const { t } = useLang();
+
   return (
     <View style={styles.container}>
-      <View style={styles.topRow}>
-        <View>
-          <Text style={styles.subtitle}>Bienvenue</Text>
-          <Text style={styles.title}>NBK Market</Text>
-        </View>
-        <View style={styles.searchIcon}>
-          <Text style={{ fontSize: 16 }}>🔍</Text>
-        </View>
-      </View>
+      <Text style={styles.logo}>
+        NBK<Text style={styles.logoAccent}>Market</Text>
+      </Text>
 
       <TextInput
         style={styles.searchBar}
-        placeholder="Rechercher un produit, une boutique..."
+        placeholder={t.header.searchPlaceholder}
         placeholderTextColor="rgba(255,255,255,0.4)"
       />
     </View>
@@ -30,30 +27,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 14,
   },
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  subtitle: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.5)",
-  },
-  title: {
+  logo: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.white,
+    marginBottom: 12,
   },
-  searchIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.navyLight,
-    alignItems: "center",
-    justifyContent: "center",
+  logoAccent: {
+    color: colors.accent,
   },
   searchBar: {
-    marginTop: 14,
     backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 10,
     paddingHorizontal: 14,

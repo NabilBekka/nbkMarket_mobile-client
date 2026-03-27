@@ -1,19 +1,10 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
 import { useState } from "react";
 import { colors } from "@/constants/colors";
-
-const categories = [
-  "Tout",
-  "Mode",
-  "Électronique",
-  "Maison",
-  "Beauté",
-  "Alimentation",
-  "Artisanat",
-  "Sport",
-];
+import { useLang } from "@/context/LangContext";
 
 export default function CategoryPills() {
+  const { t } = useLang();
   const [active, setActive] = useState(0);
 
   return (
@@ -23,7 +14,7 @@ export default function CategoryPills() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {categories.map((cat, i) => (
+        {t.categories.map((cat, i) => (
           <TouchableOpacity
             key={cat}
             onPress={() => setActive(i)}

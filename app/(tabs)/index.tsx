@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import Header from "@/components/Header";
 import CategoryPills from "@/components/CategoryPills";
 import ProductCard from "@/components/ProductCard";
-import BottomTabBar from "@/components/BottomTabBar";
+import { useLang } from "@/context/LangContext";
 import { colors } from "@/constants/colors";
 
 const products = [
@@ -17,23 +17,25 @@ const products = [
   { emoji: "🧢", emojiBg: "#E8EAF6", name: "Casquette NBK Style", shop: "Urban DZ", price: "1 800 DA", location: "Sétif" },
 ];
 
-export default function Home() {
+export default function HomeTab() {
+  const { t } = useLang();
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      <ScrollView style={styles.scrollView} stickyHeaderIndices={[0, 1]}>
+      <ScrollView stickyHeaderIndices={[0, 1]}>
         <Header />
         <CategoryPills />
 
         <View style={styles.content}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Tendances à Alger</Text>
-            <Text style={styles.viewAll}>Voir tout</Text>
+            <Text style={styles.sectionTitle}>{t.home.trending}</Text>
+            <Text style={styles.viewAll}>{t.home.viewAll}</Text>
           </View>
 
           <View style={styles.grid}>
-            {products.map((product, i) => (
+            {products.map((product) => (
               <View key={product.name} style={styles.gridItem}>
                 <ProductCard {...product} />
               </View>
@@ -41,8 +43,6 @@ export default function Home() {
           </View>
         </View>
       </ScrollView>
-
-      <BottomTabBar />
     </View>
   );
 }
@@ -51,9 +51,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgGray,
-  },
-  scrollView: {
-    flex: 1,
   },
   content: {
     padding: 14,
