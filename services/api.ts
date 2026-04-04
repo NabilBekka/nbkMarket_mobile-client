@@ -11,9 +11,10 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
   try {
+    const { headers: optHeaders, ...restOptions } = options;
     const res = await fetch(`${API_URL}${endpoint}`, {
-      headers: { "Content-Type": "application/json", ...options.headers },
-      ...options,
+      headers: { "Content-Type": "application/json", ...(optHeaders as Record<string, string>) },
+      ...restOptions,
     });
 
     const data = await res.json();
@@ -50,13 +51,44 @@ export const api = {
         { method: "POST", body: JSON.stringify(body) }
       ),
 
-    login: (body: { email: string; password: string }) =>
+    resendCode: (body: { email: string }) =>
+      request("/auth/resend-code", { method: "POST", body: JSON.stringify(body) }),
+
+    checkUsername: (username: string) =>
+      request<{ available: boolean }>(`/auth/check-username/${username}`),
+
+    google: (body: { credential: string }) =>
       request<{
-        accessToken: string;
-        user: Record<string, unknown>;
-        needsVerification?: boolean;
-        email?: string;
-      }>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+        accessToken?: string;
+        user?: Record<string, unknown>;
+        isExistingUser?: boolean;
+        googleData?: {
+          googleId: string;
+          email: string;
+          firstName: string;
+          lastName: string;
+        };
+      }>("/auth/google", { method: "POST", body: JSON.stringify(body) }),
+
+    googleRegister: (body: {
+      googleId: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      username: string;
+      password: string;
+      birthDate?: string;
+    }) =>
+      request<{ accessToken: string; user: Record<string, unknown> }>(
+        "/auth/google/register",
+        { method: "POST", body: JSON.stringify(body) }
+      ),
+
+    login: (body: { email: string; password: string }) =>
+      request<{ accessToken: string; user: Record<string, unknown> }>(
+        "/auth/login",
+        { method: "POST", body: JSON.stringify(body) }
+      ),
 
     forgotPassword: (body: { email: string; lang?: string }) =>
       request("/auth/forgot-password", { method: "POST", body: JSON.stringify(body) }),
@@ -65,14 +97,33 @@ export const api = {
       request("/auth/reset-password", { method: "POST", body: JSON.stringify(body) }),
 
     logout: (token: string) =>
-      request("/auth/logout", {
-        method: "POST",
-        headers: authHeaders(token),
-      }),
+      request("/auth/logout", { method: "POST", headers: authHeaders(token) }),
 
     getMe: (token: string) =>
-      request<{ user: Record<string, unknown> }>("/auth/me", {
+      request<{ user: Record<string, unknown> }>("/auth/me", { headers: authHeaders(token) }),
+
+    updateProfile: (
+      token: string,
+      body: { password: string; updates: Record<string, string> }
+    ) =>
+      request<{ user: Record<string, unknown> }>("/auth/profile", {
+        method: "PUT",
         headers: authHeaders(token),
+        body: JSON.stringify(body),
+      }),
+
+    deleteAccount: (token: string, body: { password: string }) =>
+      request("/auth/account", {
+        method: "DELETE",
+        headers: authHeaders(token),
+        body: JSON.stringify(body),
+      }),
+
+    updateLang: (token: string, body: { lang: string }) =>
+      request("/auth/lang", {
+        method: "PUT",
+        headers: authHeaders(token),
+        body: JSON.stringify(body),
       }),
   },
 };
