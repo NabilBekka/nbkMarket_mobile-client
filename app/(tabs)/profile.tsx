@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, Switch,
-  StyleSheet, ActivityIndicator, Modal, Alert,
+  StyleSheet, ActivityIndicator, Modal, Keyboard,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
@@ -41,29 +42,38 @@ export default function ProfileTab() {
   const [view, setView] = useState<ProfileView>("login");
   const [verifyEmail, setVerifyEmail] = useState("");
   const [googleData, setGoogleData] = useState<{ googleId: string; email: string; firstName: string; lastName: string } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (user) setView("profile");
     else setView("login");
   }, [user]);
 
+  // Reset to main profile/login when tab is pressed
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        if (view !== "profile") setView("profile");
+      } else {
+        if (view !== "login" && view !== "register" && view !== "forgot-email" && view !== "forgot-code" && view !== "verify" && view !== "google-register") {
+          setView("login");
+        }
+      }
+    }, [user])
+  );
+
   if (isLoading) {
-    return (
-      <View style={[s.container, { justifyContent: "center", alignItems: "center" }]}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
+    return <View style={[s.container, { justifyContent: "center", alignItems: "center" }]}><ActivityIndicator size="large" color={colors.accent} /></View>;
   }
 
   const handleLangChange = (newLang: "en" | "fr") => {
     setLang(newLang);
-    if (user && accessToken) {
-      api.auth.updateLang(accessToken, { lang: newLang });
-    }
+    if (user && accessToken) api.auth.updateLang(accessToken, { lang: newLang });
   };
 
   const goToVerify = (email: string) => { setVerifyEmail(email); setView("verify"); };
   const goToGoogleRegister = (data: typeof googleData) => { setGoogleData(data); setView("google-register"); };
+  const goToForgot = () => setView("forgot-email");
 
   return (
     <View style={s.container}>
@@ -71,24 +81,30 @@ export default function ProfileTab() {
       <View style={s.header}>
         <Text style={s.headerTitle}>{view === "settings" ? t.settings.title : t.tabs.profile}</Text>
         <View style={s.langSwitch}>
-          <TouchableOpacity style={[s.langBtn, lang === "en" && s.langActive]} onPress={() => handleLangChange("en")}>
-            <Text style={s.flag}>🇬🇧</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.langBtn, lang === "fr" && s.langActive]} onPress={() => handleLangChange("fr")}>
-            <Text style={s.flag}>🇫🇷</Text>
-          </TouchableOpacity>
+          <TouchableOpacity style={[s.langBtn, lang === "en" && s.langActive]} onPress={() => handleLangChange("en")}><Text style={s.flag}>🇬🇧</Text></TouchableOpacity>
+          <TouchableOpacity style={[s.langBtn, lang === "fr" && s.langActive]} onPress={() => handleLangChange("fr")}><Text style={s.flag}>🇫🇷</Text></TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1, backgroundColor: colors.bgGray }} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {view === "login" && <LoginSection onSwitchRegister={() => setView("register")} onSwitchForgot={() => setView("forgot-email")} onNeedsVerify={goToVerify} onGoogleRegister={goToGoogleRegister} />}
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1, backgroundColor: colors.bgGray }}
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
+        {view === "login" && <LoginSection onSwitchRegister={() => setView("register")} onSwitchForgot={goToForgot} onNeedsVerify={goToVerify} onGoogleRegister={goToGoogleRegister} />}
         {view === "register" && <RegisterSection onSwitchLogin={() => setView("login")} onNeedsVerify={goToVerify} onGoogleRegister={goToGoogleRegister} />}
         {view === "forgot-email" && <ForgotEmailSection onSwitchLogin={() => setView("login")} onCodeSent={(e) => { setVerifyEmail(e); setView("forgot-code"); }} />}
         {view === "forgot-code" && <ForgotCodeSection email={verifyEmail} onSuccess={() => setView("login")} onBack={() => setView("forgot-email")} />}
         {view === "verify" && <VerifySection email={verifyEmail} onBack={() => setView("login")} />}
         {view === "google-register" && googleData && <GoogleRegisterSection data={googleData} onBack={() => setView("login")} />}
         {view === "profile" && <ConnectedProfile onSettings={() => setView("settings")} />}
-        {view === "settings" && <SettingsSection onBack={() => setView("profile")} />}
+        {view === "settings" && <SettingsSection onBack={() => setView("profile")} onForgot={goToForgot} />}
+
+        {/* Extra space for keyboard */}
+        <View style={{ height: 120 }} />
       </ScrollView>
     </View>
   );
@@ -99,25 +115,20 @@ function ConnectedProfile({ onSettings }: { onSettings: () => void }) {
   const { t } = useLang();
   const { user, logout } = useAuth();
   if (!user) return null;
-
   return (
     <View style={{ alignItems: "center", paddingTop: 24 }}>
       <View style={s.avatarCircle}><Text style={s.avatarText}>{user.first_name[0]}{user.last_name[0]}</Text></View>
       <Text style={s.profileName}>{user.first_name} {user.last_name}</Text>
       <Text style={s.profileEmail}>{user.email}</Text>
       <Text style={s.profileMeta}>@{user.username}</Text>
-      <TouchableOpacity style={s.settingsBtn} onPress={onSettings}>
-        <Text style={s.settingsBtnText}>⚙️ {t.profile.settings}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={s.logoutBtn} onPress={logout}>
-        <Text style={s.logoutText}>{t.profile.logout}</Text>
-      </TouchableOpacity>
+      <TouchableOpacity style={s.settingsBtn} onPress={onSettings}><Text style={s.settingsBtnText}>⚙️ {t.profile.settings}</Text></TouchableOpacity>
+      <TouchableOpacity style={s.logoutBtn} onPress={logout}><Text style={s.logoutText}>{t.profile.logout}</Text></TouchableOpacity>
     </View>
   );
 }
 
 /* ====== SETTINGS ====== */
-function SettingsSection({ onBack }: { onBack: () => void }) {
+function SettingsSection({ onBack, onForgot }: { onBack: () => void; onForgot: () => void }) {
   const { t } = useLang();
   const { user, accessToken, updateUser, logout } = useAuth();
   const [editing, setEditing] = useState<Record<string, boolean>>({});
@@ -145,26 +156,15 @@ function SettingsSection({ onBack }: { onBack: () => void }) {
     { key: "new_password", label: t.settings.password, value: t.settings.passwordHidden, type: "password" },
   ];
 
-  const startEdit = (key: string, val: string) => {
-    setEditing(p => ({ ...p, [key]: true }));
-    setEditValues(p => ({ ...p, [key]: key === "new_password" ? "" : val }));
-    setSaveSuccess(false); setSaveError("");
-  };
-
-  const cancelEdit = (key: string) => {
-    setEditing(p => ({ ...p, [key]: false }));
-    setEditValues(p => { const c = { ...p }; delete c[key]; return c; });
-  };
-
+  const startEdit = (key: string, val: string) => { setEditing(p => ({ ...p, [key]: true })); setEditValues(p => ({ ...p, [key]: key === "new_password" ? "" : val })); setSaveSuccess(false); setSaveError(""); };
+  const cancelEdit = (key: string) => { setEditing(p => ({ ...p, [key]: false })); setEditValues(p => { const c = { ...p }; delete c[key]; return c; }); };
   const hasEdits = Object.values(editing).some(Boolean);
 
   const handleSave = async () => {
     setSaveSuccess(false); setSaveError("");
     if (!confirmPw) { setSaveError(t.settings.saveError); return; }
     const updates: Record<string, string> = {};
-    for (const [key, isEd] of Object.entries(editing)) {
-      if (isEd && editValues[key] !== undefined && editValues[key] !== "") updates[key] = editValues[key];
-    }
+    for (const [key, isEd] of Object.entries(editing)) { if (isEd && editValues[key] !== undefined && editValues[key] !== "") updates[key] = editValues[key]; }
     if (Object.keys(updates).length === 0) return;
     setSaveLoading(true);
     const res = await api.auth.updateProfile(accessToken, { password: confirmPw, updates });
@@ -185,9 +185,7 @@ function SettingsSection({ onBack }: { onBack: () => void }) {
   return (
     <View>
       <TouchableOpacity onPress={onBack}><Text style={s.linkText}>{t.settings.back}</Text></TouchableOpacity>
-
       {saveSuccess && <View style={s.successBox}><Text style={s.successText}>✓ {t.settings.saveSuccess}</Text></View>}
-
       <Text style={[s.title, { marginTop: 12 }]}>{t.settings.accountInfo}</Text>
       <View style={s.card}>
         {fields.map(f => (
@@ -197,72 +195,49 @@ function SettingsSection({ onBack }: { onBack: () => void }) {
               {editing[f.key] ? (
                 <TextInput style={s.fieldInput} value={editValues[f.key] || ""} secureTextEntry={f.type === "password"}
                   onChangeText={v => setEditValues(p => ({ ...p, [f.key]: v }))} autoFocus keyboardType={f.type === "email" ? "email-address" : "default"} />
-              ) : (
-                <Text style={s.fieldValue}>{f.value}</Text>
-              )}
+              ) : <Text style={s.fieldValue}>{f.value}</Text>}
             </View>
-            {f.editable !== false && (
-              editing[f.key]
-                ? <TouchableOpacity onPress={() => cancelEdit(f.key)}><Text style={s.cancelText}>{t.settings.cancel}</Text></TouchableOpacity>
-                : <TouchableOpacity onPress={() => startEdit(f.key, f.value)}><Text style={s.editText}>{t.settings.edit}</Text></TouchableOpacity>
-            )}
+            {f.editable !== false && (editing[f.key]
+              ? <TouchableOpacity onPress={() => cancelEdit(f.key)}><Text style={s.cancelText}>{t.settings.cancel}</Text></TouchableOpacity>
+              : <TouchableOpacity onPress={() => startEdit(f.key, f.value)}><Text style={s.editText}>{t.settings.edit}</Text></TouchableOpacity>)}
           </View>
         ))}
       </View>
-
       {hasEdits && (
         <View style={s.card}>
           <Text style={s.label}>{t.settings.confirmPassword}</Text>
-          <View>
-            <TextInput style={[s.input, { paddingRight: 44 }]} placeholder={t.settings.confirmPasswordPlaceholder} placeholderTextColor="#bbb"
-              value={confirmPw} onChangeText={setConfirmPw} secureTextEntry={!showConfirmPw} />
-            <TouchableOpacity style={s.eyeBtn} onPress={() => setShowConfirmPw(!showConfirmPw)}>
-              <Text style={{ fontSize: 16 }}>{showConfirmPw ? "🙈" : "👁️"}</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity><Text style={[s.linkText, { marginTop: 4 }]}>{t.settings.forgotPassword}</Text></TouchableOpacity>
+          <View><TextInput style={[s.input, { paddingRight: 44 }]} placeholder={t.settings.confirmPasswordPlaceholder} placeholderTextColor="#bbb" value={confirmPw} onChangeText={setConfirmPw} secureTextEntry={!showConfirmPw} />
+            <TouchableOpacity style={s.eyeBtn} onPress={() => setShowConfirmPw(!showConfirmPw)}><Text style={{ fontSize: 16 }}>{showConfirmPw ? "🙈" : "👁️"}</Text></TouchableOpacity></View>
+          <TouchableOpacity onPress={onForgot}><Text style={[s.linkText, { marginTop: 4 }]}>{t.settings.forgotPassword}</Text></TouchableOpacity>
           <TouchableOpacity style={[s.submitBtn, { marginTop: 14 }]} onPress={handleSave} disabled={saveLoading}>
             {saveLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>{t.settings.save}</Text>}
           </TouchableOpacity>
           {saveError !== "" && <Text style={s.errorTextMsg}>{saveError}</Text>}
         </View>
       )}
-
       <View style={s.dangerCard}>
         <Text style={s.dangerTitle}>{t.settings.deleteAccount}</Text>
         <Text style={s.dangerText}>{t.settings.deleteWarning}</Text>
         <Text style={s.label}>{t.settings.deletePassword}</Text>
-        <View>
-          <TextInput style={[s.input, { paddingRight: 44 }]} placeholder={t.settings.deletePasswordPlaceholder} placeholderTextColor="#bbb"
-            value={deletePw} onChangeText={setDeletePw} secureTextEntry={!showDeletePw} />
-          <TouchableOpacity style={s.eyeBtn} onPress={() => setShowDeletePw(!showDeletePw)}>
-            <Text style={{ fontSize: 16 }}>{showDeletePw ? "🙈" : "👁️"}</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity><Text style={[s.linkText, { marginTop: 4 }]}>{t.settings.forgotPassword}</Text></TouchableOpacity>
+        <View><TextInput style={[s.input, { paddingRight: 44 }]} placeholder={t.settings.deletePasswordPlaceholder} placeholderTextColor="#bbb" value={deletePw} onChangeText={setDeletePw} secureTextEntry={!showDeletePw} />
+          <TouchableOpacity style={s.eyeBtn} onPress={() => setShowDeletePw(!showDeletePw)}><Text style={{ fontSize: 16 }}>{showDeletePw ? "🙈" : "👁️"}</Text></TouchableOpacity></View>
+        <TouchableOpacity onPress={onForgot}><Text style={[s.linkText, { marginTop: 4 }]}>{t.settings.forgotPassword}</Text></TouchableOpacity>
         {deleteError !== "" && <Text style={s.errorTextMsg}>{deleteError}</Text>}
         <TouchableOpacity style={s.deleteBtn} onPress={() => { if (!deletePw) { setDeleteError(t.settings.deleteError); return; } setDeleteError(""); setShowDeleteModal(true); }}>
-          <Text style={s.deleteBtnText}>{t.settings.deleteBtn}</Text>
-        </TouchableOpacity>
+          <Text style={s.deleteBtnText}>{t.settings.deleteBtn}</Text></TouchableOpacity>
       </View>
-
       <Modal visible={showDeleteModal} transparent animationType="fade">
-        <View style={s.modalOverlay}>
-          <View style={s.modal}>
-            <Text style={s.modalTitle}>{t.settings.deleteModalTitle}</Text>
-            <Text style={s.modalText}>{t.settings.deleteModalText}</Text>
-            <View style={s.modalActions}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setShowDeleteModal(false)}>
-                <Text style={s.modalCancelText}>{t.settings.deleteModalCancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.modalConfirmBtn} onPress={handleDeleteConfirm} disabled={deleteLoading}>
-                {deleteLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.modalConfirmText}>{t.settings.deleteModalConfirm}</Text>}
-              </TouchableOpacity>
-            </View>
+        <View style={s.modalOverlay}><View style={s.modal}>
+          <Text style={s.modalTitle}>{t.settings.deleteModalTitle}</Text>
+          <Text style={s.modalText}>{t.settings.deleteModalText}</Text>
+          <View style={s.modalActions}>
+            <TouchableOpacity style={s.modalCancel} onPress={() => setShowDeleteModal(false)}><Text style={s.modalCancelText}>{t.settings.deleteModalCancel}</Text></TouchableOpacity>
+            <TouchableOpacity style={s.modalConfirmBtn} onPress={handleDeleteConfirm} disabled={deleteLoading}>
+              {deleteLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.modalConfirmText}>{t.settings.deleteModalConfirm}</Text>}
+            </TouchableOpacity>
           </View>
-        </View>
+        </View></View>
       </Modal>
-
       <View style={{ height: 40 }} />
     </View>
   );
@@ -270,71 +245,38 @@ function SettingsSection({ onBack }: { onBack: () => void }) {
 
 /* ====== LOGIN ====== */
 function LoginSection({ onSwitchRegister, onSwitchForgot, onNeedsVerify, onGoogleRegister }: {
-  onSwitchRegister: () => void; onSwitchForgot: () => void; onNeedsVerify: (e: string) => void;
-  onGoogleRegister: (d: any) => void;
+  onSwitchRegister: () => void; onSwitchForgot: () => void; onNeedsVerify: (e: string) => void; onGoogleRegister: (d: any) => void;
 }) {
   const { t, lang } = useLang();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [touchedEmail, setTouchedEmail] = useState(false);
-  const [touchedPw, setTouchedPw] = useState(false);
-  const [serverError, setServerError] = useState("");
-  const [loading, setLoading] = useState(false);
-
+  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [showPw, setShowPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false); const [touchedEmail, setTouchedEmail] = useState(false); const [touchedPw, setTouchedPw] = useState(false);
+  const [serverError, setServerError] = useState(""); const [loading, setLoading] = useState(false);
   const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest({ expoClientId: GOOGLE_CLIENT_ID, webClientId: GOOGLE_CLIENT_ID, androidClientId: GOOGLE_CLIENT_ID, iosClientId: GOOGLE_CLIENT_ID });
 
-  useEffect(() => {
-    AsyncStorage.getItem("nbk-remember-email").then(saved => { if (saved) { setEmail(saved); setRememberMe(true); } });
-  }, []);
-
-  useEffect(() => {
-    if (googleResponse?.type === "success" && googleResponse.authentication?.accessToken) {
-      handleGoogleToken(googleResponse.authentication.accessToken);
-    }
-  }, [googleResponse]);
+  useEffect(() => { AsyncStorage.getItem("nbk-remember-email").then(saved => { if (saved) { setEmail(saved); setRememberMe(true); } }); }, []);
+  useEffect(() => { if (googleResponse?.type === "success" && googleResponse.authentication?.accessToken) handleGoogleToken(googleResponse.authentication.accessToken); }, [googleResponse]);
 
   const handleGoogleToken = async (accessToken: string) => {
     setServerError(""); setLoading(true);
-    const res = await api.auth.google({ credential: accessToken });
-    setLoading(false);
+    const res = await api.auth.google({ credential: accessToken }); setLoading(false);
     if (res.error) { setServerError(res.error); return; }
-    if (res.data?.isExistingUser && res.data.accessToken && res.data.user) {
-      login(res.data.accessToken, res.data.user as any);
-    } else if (res.data?.googleData) {
-      onGoogleRegister(res.data.googleData);
-    }
+    if (res.data?.isExistingUser && res.data.accessToken && res.data.user) login(res.data.accessToken, res.data.user as any);
+    else if (res.data?.googleData) onGoogleRegister(res.data.googleData);
   };
 
   const emailValid = emailRegex.test(email);
-
   const handleSubmit = async () => {
-    setTouchedEmail(true); setTouchedPw(true); setServerError("");
-    if (!emailValid) return;
-    setLoading(true);
-    const res = await api.auth.login({ email, password });
-    setLoading(false);
-    if (res.error) {
-      if (res.data && (res.data as any).needsVerification) { onNeedsVerify(email); return; }
-      setServerError(t.login.error); return;
-    }
-    if (res.data) {
-      if (rememberMe) AsyncStorage.setItem("nbk-remember-email", email);
-      else AsyncStorage.removeItem("nbk-remember-email");
-      login(res.data.accessToken, res.data.user as any);
-    }
+    setTouchedEmail(true); setTouchedPw(true); setServerError(""); if (!emailValid) return;
+    setLoading(true); const res = await api.auth.login({ email, password }); setLoading(false);
+    if (res.error) { if (res.data && (res.data as any).needsVerification) { onNeedsVerify(email); return; } setServerError(t.login.error); return; }
+    if (res.data) { if (rememberMe) AsyncStorage.setItem("nbk-remember-email", email); else AsyncStorage.removeItem("nbk-remember-email"); login(res.data.accessToken, res.data.user as any); }
   };
 
   return (
     <View>
-      <Text style={s.title}>{t.login.title}</Text>
-      <Text style={s.subtitle}>{t.login.subtitle}</Text>
-      <TouchableOpacity style={s.googleBtn} onPress={() => promptGoogleAsync()}>
-        <Text style={s.googleG}>G</Text>
-        <Text style={s.googleBtnText}>{t.login.googleBtn}</Text>
-      </TouchableOpacity>
+      <Text style={s.title}>{t.login.title}</Text><Text style={s.subtitle}>{t.login.subtitle}</Text>
+      <TouchableOpacity style={s.googleBtn} onPress={() => promptGoogleAsync()}><Text style={s.googleG}>G</Text><Text style={s.googleBtnText}>{t.login.googleBtn}</Text></TouchableOpacity>
       <View style={s.divider}><View style={s.dividerLine} /><Text style={s.dividerText}>{t.login.or}</Text><View style={s.dividerLine} /></View>
       {serverError !== "" && <View style={s.errorBox}><Text style={s.errorBoxText}>{serverError}</Text></View>}
       <Text style={s.label}>{t.login.email}</Text>
@@ -348,9 +290,7 @@ function LoginSection({ onSwitchRegister, onSwitchForgot, onNeedsVerify, onGoogl
         <View style={s.rememberRow}><Switch value={rememberMe} onValueChange={setRememberMe} trackColor={{ true: colors.accent, false: "#ddd" }} thumbColor="#fff" style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }} /><Text style={s.optionText}>{t.login.rememberMe}</Text></View>
         <TouchableOpacity onPress={onSwitchForgot}><Text style={s.linkText}>{t.login.forgotPassword}</Text></TouchableOpacity>
       </View>
-      <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>{t.login.submit}</Text>}
-      </TouchableOpacity>
+      <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} disabled={loading}>{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>{t.login.submit}</Text>}</TouchableOpacity>
       <View style={s.bottomRow}><Text style={s.bottomText}>{t.login.noAccount} </Text><TouchableOpacity onPress={onSwitchRegister}><Text style={s.linkText}>{t.login.register}</Text></TouchableOpacity></View>
     </View>
   );
@@ -358,65 +298,32 @@ function LoginSection({ onSwitchRegister, onSwitchForgot, onNeedsVerify, onGoogl
 
 /* ====== REGISTER ====== */
 function RegisterSection({ onSwitchLogin, onNeedsVerify, onGoogleRegister }: { onSwitchLogin: () => void; onNeedsVerify: (e: string) => void; onGoogleRegister: (d: any) => void }) {
-  const { t, lang } = useLang();
-  const { login } = useAuth();
+  const { t, lang } = useLang(); const { login } = useAuth();
   const [form, setForm] = useState({ firstName: "", lastName: "", username: "", email: "", birthDate: "", password: "" });
-  const [showPw, setShowPw] = useState(false);
-  const [touchedPw, setTouchedPw] = useState(false);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [serverError, setServerError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
-  const [checkingUsername, setCheckingUsername] = useState(false);
-  const timer = useRef<NodeJS.Timeout | null>(null);
-
+  const [showPw, setShowPw] = useState(false); const [touchedPw, setTouchedPw] = useState(false); const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [serverError, setServerError] = useState(""); const [loading, setLoading] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null); const [checkingUsername, setCheckingUsername] = useState(false); const timer = useRef<NodeJS.Timeout | null>(null);
   const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest({ expoClientId: GOOGLE_CLIENT_ID, webClientId: GOOGLE_CLIENT_ID, androidClientId: GOOGLE_CLIENT_ID, iosClientId: GOOGLE_CLIENT_ID });
 
-  useEffect(() => {
-    if (googleResponse?.type === "success" && googleResponse.authentication?.accessToken) {
-      (async () => {
-        setLoading(true);
-        const res = await api.auth.google({ credential: googleResponse.authentication!.accessToken });
-        setLoading(false);
-        if (res.data?.isExistingUser && res.data.accessToken) login(res.data.accessToken, res.data.user as any);
-        else if (res.data?.googleData) onGoogleRegister(res.data.googleData);
-      })();
-    }
-  }, [googleResponse]);
+  useEffect(() => { if (googleResponse?.type === "success" && googleResponse.authentication?.accessToken) { (async () => { setLoading(true); const res = await api.auth.google({ credential: googleResponse.authentication!.accessToken }); setLoading(false); if (res.data?.isExistingUser && res.data.accessToken) login(res.data.accessToken, res.data.user as any); else if (res.data?.googleData) onGoogleRegister(res.data.googleData); })(); } }, [googleResponse]);
+  useEffect(() => { if (form.username.length < 3) { setUsernameAvailable(null); return; } setCheckingUsername(true); if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(async () => { const res = await api.auth.checkUsername(form.username); if (res.data) setUsernameAvailable(res.data.available); setCheckingUsername(false); }, 500); }, [form.username]);
 
-  useEffect(() => {
-    if (form.username.length < 3) { setUsernameAvailable(null); return; }
-    setCheckingUsername(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      const res = await api.auth.checkUsername(form.username);
-      if (res.data) setUsernameAvailable(res.data.available);
-      setCheckingUsername(false);
-    }, 500);
-  }, [form.username]);
-
-  const update = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
-  const touch = (k: string) => setTouched(p => ({ ...p, [k]: true }));
-  const fnValid = form.firstName.length === 0 || nameRegex.test(form.firstName);
-  const lnValid = form.lastName.length === 0 || nameRegex.test(form.lastName);
-  const emailValid = emailRegex.test(form.email);
+  const update = (k: string, v: string) => setForm(p => ({ ...p, [k]: v })); const touch = (k: string) => setTouched(p => ({ ...p, [k]: true }));
+  const fnValid = form.firstName.length === 0 || nameRegex.test(form.firstName); const lnValid = form.lastName.length === 0 || nameRegex.test(form.lastName); const emailValid = emailRegex.test(form.email);
   const checks = { length: form.password.length >= 8, uppercase: /[A-Z]/.test(form.password), lowercase: /[a-z]/.test(form.password), number: /[0-9]/.test(form.password), special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) };
   const allChecks = Object.values(checks).every(Boolean);
 
   const handleSubmit = async () => {
     setTouchedPw(true); setTouched({ firstName: true, lastName: true, email: true, username: true }); setServerError("");
     if (!nameRegex.test(form.firstName) || !nameRegex.test(form.lastName) || !emailValid || !allChecks || form.username.length < 3 || usernameAvailable === false) return;
-    setLoading(true);
-    const res = await api.auth.register({ email: form.email, password: form.password, first_name: form.firstName, last_name: form.lastName, username: form.username, birth_date: form.birthDate || undefined, lang });
-    setLoading(false);
+    setLoading(true); const res = await api.auth.register({ email: form.email, password: form.password, first_name: form.firstName, last_name: form.lastName, username: form.username, birth_date: form.birthDate || undefined, lang }); setLoading(false);
     if (res.error) { if (res.error.includes("Email")) setServerError(t.register.emailTaken); else if (res.error.includes("sername")) setServerError(t.register.usernameError); else setServerError(res.error); return; }
     onNeedsVerify(form.email);
   };
 
   return (
     <View>
-      <Text style={s.title}>{t.register.title}</Text>
-      <Text style={s.subtitle}>{t.register.subtitle}</Text>
+      <Text style={s.title}>{t.register.title}</Text><Text style={s.subtitle}>{t.register.subtitle}</Text>
       <TouchableOpacity style={s.googleBtn} onPress={() => promptGoogleAsync()}><Text style={s.googleG}>G</Text><Text style={s.googleBtnText}>{t.register.googleBtn}</Text></TouchableOpacity>
       <View style={s.divider}><View style={s.dividerLine} /><Text style={s.dividerText}>{t.register.or}</Text><View style={s.dividerLine} /></View>
       {serverError !== "" && <View style={s.errorBox}><Text style={s.errorBoxText}>{serverError}</Text></View>}
@@ -430,24 +337,21 @@ function RegisterSection({ onSwitchLogin, onNeedsVerify, onGoogleRegister }: { o
       <View style={s.field}><Text style={s.label}>{t.register.password}</Text><View><TextInput style={[s.input, { paddingRight: 44 }]} placeholder={t.register.passwordPlaceholder} placeholderTextColor="#bbb" value={form.password} onChangeText={v => { update("password", v); setTouchedPw(true); }} secureTextEntry={!showPw} /><TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(!showPw)}><Text style={{ fontSize: 16 }}>{showPw ? "🙈" : "👁️"}</Text></TouchableOpacity></View>{touchedPw && form.password.length > 0 && <PasswordChecks password={form.password} />}</View>
       <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} disabled={loading}>{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>{t.register.submit}</Text>}</TouchableOpacity>
       <View style={s.bottomRow}><Text style={s.bottomText}>{t.register.hasAccount} </Text><TouchableOpacity onPress={onSwitchLogin}><Text style={s.linkText}>{t.register.login}</Text></TouchableOpacity></View>
-      <View style={{ height: 30 }} />
     </View>
   );
 }
 
 /* ====== VERIFY ====== */
 function VerifySection({ email, onBack }: { email: string; onBack: () => void }) {
-  const { t } = useLang();
-  const { login } = useAuth();
+  const { t } = useLang(); const { login } = useAuth();
   const [code, setCode] = useState(""); const [error, setError] = useState(""); const [success, setSuccess] = useState(false); const [loading, setLoading] = useState(false);
   const handleSubmit = async () => { if (code.length !== 6) return; setError(""); setLoading(true); const res = await api.auth.verifyEmail({ email, code }); setLoading(false); if (res.error) { setError(t.verify.error); return; } if (res.data) { login(res.data.accessToken, res.data.user as any); setSuccess(true); } };
-  const handleResend = async () => { await api.auth.resendCode({ email }); };
   return (<View><Text style={s.title}>{t.verify.title}</Text><Text style={s.subtitle}>{t.verify.subtitle} <Text style={{ fontWeight: "700" }}>{email}</Text></Text>
     {success ? <View style={s.successBox}><Text style={s.successText}>✓ {t.verify.success}</Text></View> : <>
       {error !== "" && <View style={s.errorBox}><Text style={s.errorBoxText}>{error}</Text></View>}
       <TextInput style={s.codeInput} placeholder={t.verify.codePlaceholder} placeholderTextColor="#ddd" value={code} onChangeText={v => setCode(v.replace(/\D/g, "").slice(0, 6))} maxLength={6} keyboardType="number-pad" />
       <TouchableOpacity style={[s.submitBtn, { marginTop: 16 }]} onPress={handleSubmit} disabled={loading || code.length !== 6}>{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>{t.verify.submit}</Text>}</TouchableOpacity>
-      <TouchableOpacity style={{ alignItems: "center", marginTop: 14 }} onPress={handleResend}><Text style={s.linkText}>{t.verify.resend}</Text></TouchableOpacity></>}
+      <TouchableOpacity style={{ alignItems: "center", marginTop: 14 }} onPress={() => api.auth.resendCode({ email })}><Text style={s.linkText}>{t.verify.resend}</Text></TouchableOpacity></>}
     <TouchableOpacity style={{ alignItems: "center", marginTop: 20 }} onPress={onBack}><Text style={[s.linkText, { color: colors.textGray }]}>← {t.forgot.backToLogin}</Text></TouchableOpacity></View>);
 }
 
@@ -455,9 +359,18 @@ function VerifySection({ email, onBack }: { email: string; onBack: () => void })
 function ForgotEmailSection({ onSwitchLogin, onCodeSent }: { onSwitchLogin: () => void; onCodeSent: (e: string) => void }) {
   const { t, lang } = useLang();
   const [email, setEmail] = useState(""); const [touchedEmail, setTouchedEmail] = useState(false); const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const emailValid = emailRegex.test(email);
-  const handleSubmit = async () => { setTouchedEmail(true); if (!emailValid) return; setLoading(true); await api.auth.forgotPassword({ email, lang }); setLoading(false); onCodeSent(email); };
+  const handleSubmit = async () => {
+    setTouchedEmail(true); setError(""); if (!emailValid) return;
+    setLoading(true);
+    const res = await api.auth.forgotPassword({ email, lang });
+    setLoading(false);
+    if (res.error) { setError(res.error); return; }
+    onCodeSent(email);
+  };
   return (<View><Text style={s.title}>{t.forgot.title}</Text><Text style={s.subtitle}>{t.forgot.subtitle}</Text>
+    {error !== "" && <View style={s.errorBox}><Text style={s.errorBoxText}>{error}</Text></View>}
     <Text style={s.label}>{t.forgot.email}</Text><TextInput style={[s.input, touchedEmail && !emailValid && email.length > 0 && s.inputError]} placeholder={t.forgot.emailPlaceholder} placeholderTextColor="#bbb" value={email} onChangeText={setEmail} onBlur={() => setTouchedEmail(true)} keyboardType="email-address" autoCapitalize="none" />{touchedEmail && !emailValid && email.length > 0 && <Text style={s.errorText}>{t.forgot.emailError}</Text>}
     <TouchableOpacity style={[s.submitBtn, { marginTop: 16 }]} onPress={handleSubmit} disabled={loading}>{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>{t.forgot.submit}</Text>}</TouchableOpacity>
     <TouchableOpacity style={{ alignItems: "center", marginTop: 20 }} onPress={onSwitchLogin}><Text style={s.linkText}>← {t.forgot.backToLogin}</Text></TouchableOpacity></View>);
@@ -482,33 +395,14 @@ function ForgotCodeSection({ email, onSuccess, onBack }: { email: string; onSucc
 
 /* ====== GOOGLE REGISTER ====== */
 function GoogleRegisterSection({ data, onBack }: { data: { googleId: string; email: string; firstName: string; lastName: string }; onBack: () => void }) {
-  const { t } = useLang();
-  const { login } = useAuth();
+  const { t } = useLang(); const { login } = useAuth();
   const [username, setUsername] = useState(""); const [birthDate, setBirthDate] = useState(""); const [password, setPassword] = useState(""); const [showPw, setShowPw] = useState(false); const [touchedPw, setTouchedPw] = useState(false);
   const [serverError, setServerError] = useState(""); const [loading, setLoading] = useState(false);
-  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null); const [checkingUsername, setCheckingUsername] = useState(false);
-  const timer = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (username.length < 3) { setUsernameAvailable(null); return; }
-    setCheckingUsername(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => { const res = await api.auth.checkUsername(username); if (res.data) setUsernameAvailable(res.data.available); setCheckingUsername(false); }, 500);
-  }, [username]);
-
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null); const [checkingUsername, setCheckingUsername] = useState(false); const timer = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => { if (username.length < 3) { setUsernameAvailable(null); return; } setCheckingUsername(true); if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(async () => { const res = await api.auth.checkUsername(username); if (res.data) setUsernameAvailable(res.data.available); setCheckingUsername(false); }, 500); }, [username]);
   const checks = { length: password.length >= 8, uppercase: /[A-Z]/.test(password), lowercase: /[a-z]/.test(password), number: /[0-9]/.test(password), special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) };
   const allChecks = Object.values(checks).every(Boolean);
-
-  const handleSubmit = async () => {
-    setTouchedPw(true); setServerError("");
-    if (username.length < 3 || usernameAvailable === false || !allChecks) return;
-    setLoading(true);
-    const res = await api.auth.googleRegister({ googleId: data.googleId, email: data.email, firstName: data.firstName, lastName: data.lastName, username, password, birthDate: birthDate || undefined });
-    setLoading(false);
-    if (res.error) { setServerError(res.error.includes("sername") ? t.googleRegister.usernameError : res.error); return; }
-    if (res.data) login(res.data.accessToken, res.data.user as any);
-  };
-
+  const handleSubmit = async () => { setTouchedPw(true); setServerError(""); if (username.length < 3 || usernameAvailable === false || !allChecks) return; setLoading(true); const res = await api.auth.googleRegister({ googleId: data.googleId, email: data.email, firstName: data.firstName, lastName: data.lastName, username, password, birthDate: birthDate || undefined }); setLoading(false); if (res.error) { setServerError(res.error.includes("sername") ? t.googleRegister.usernameError : res.error); return; } if (res.data) login(res.data.accessToken, res.data.user as any); };
   return (
     <View>
       <Text style={s.title}>{t.googleRegister.title}</Text><Text style={s.subtitle}>{t.googleRegister.subtitle}</Text>
@@ -519,7 +413,6 @@ function GoogleRegisterSection({ data, onBack }: { data: { googleId: string; ema
       <View style={s.field}><Text style={s.label}>{t.googleRegister.password}</Text><View><TextInput style={[s.input, { paddingRight: 44 }]} placeholder={t.googleRegister.passwordPlaceholder} placeholderTextColor="#bbb" value={password} onChangeText={v => { setPassword(v); setTouchedPw(true); }} secureTextEntry={!showPw} /><TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(!showPw)}><Text style={{ fontSize: 16 }}>{showPw ? "🙈" : "👁️"}</Text></TouchableOpacity></View>{touchedPw && password.length > 0 && <PasswordChecks password={password} />}</View>
       <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} disabled={loading}>{loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>{t.googleRegister.submit}</Text>}</TouchableOpacity>
       <TouchableOpacity style={{ alignItems: "center", marginTop: 20 }} onPress={onBack}><Text style={[s.linkText, { color: colors.textGray }]}>← {t.forgot.backToLogin}</Text></TouchableOpacity>
-      <View style={{ height: 30 }} />
     </View>
   );
 }
@@ -533,7 +426,7 @@ const s = StyleSheet.create({
   langBtn: { padding: 4, borderRadius: 4, borderWidth: 2, borderColor: "transparent", opacity: 0.5 },
   langActive: { opacity: 1, borderColor: colors.accent },
   flag: { fontSize: 18 },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 20 },
   title: { fontSize: 22, fontWeight: "700", color: colors.textDark },
   subtitle: { fontSize: 13, color: colors.textGray, marginBottom: 20, lineHeight: 20 },
   googleBtn: { borderWidth: 1, borderColor: "#ddd", borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#fff" },
@@ -567,7 +460,6 @@ const s = StyleSheet.create({
   row: { flexDirection: "row", gap: 10 },
   halfField: { flex: 1, marginBottom: 12 },
   field: { marginBottom: 12 },
-  // Connected profile
   avatarCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.navyLight, alignItems: "center", justifyContent: "center", marginBottom: 16 },
   avatarText: { fontSize: 24, fontWeight: "700", color: colors.accent },
   profileName: { fontSize: 20, fontWeight: "700", color: colors.textDark },
@@ -577,7 +469,6 @@ const s = StyleSheet.create({
   settingsBtnText: { fontSize: 14, fontWeight: "500", color: colors.textDark },
   logoutBtn: { marginTop: 12, borderWidth: 1, borderColor: "#FFCDD2", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 28 },
   logoutText: { fontSize: 14, fontWeight: "500", color: "#E53935" },
-  // Settings
   card: { backgroundColor: "#fff", borderRadius: 12, padding: 16, borderWidth: 1, borderColor: "#eee", marginBottom: 16 },
   fieldRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#f3f3f3" },
   fieldLabel: { fontSize: 11, fontWeight: "600", color: colors.textGray, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 },
@@ -590,7 +481,6 @@ const s = StyleSheet.create({
   dangerText: { fontSize: 13, color: colors.textGray, marginBottom: 14, lineHeight: 20 },
   deleteBtn: { backgroundColor: "#E53935", borderRadius: 10, padding: 13, alignItems: "center", marginTop: 14 },
   deleteBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
-  // Modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
   modal: { backgroundColor: "#fff", borderRadius: 16, padding: 24, width: "100%" },
   modalTitle: { fontSize: 20, fontWeight: "700", color: "#E53935", marginBottom: 12 },
@@ -600,7 +490,6 @@ const s = StyleSheet.create({
   modalCancelText: { fontSize: 13, fontWeight: "500", color: colors.textDark },
   modalConfirmBtn: { flex: 1, padding: 12, backgroundColor: "#E53935", borderRadius: 10, alignItems: "center" },
   modalConfirmText: { fontSize: 13, fontWeight: "600", color: "#fff" },
-  // Google register info
   googleInfoBox: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.bgGray, padding: 14, borderRadius: 10, marginBottom: 20 },
   googleInfoAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.navyDark, alignItems: "center", justifyContent: "center" },
   googleInfoInitials: { fontSize: 14, fontWeight: "700", color: colors.accent },
