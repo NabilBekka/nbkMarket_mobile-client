@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, Switch,
-  StyleSheet, ActivityIndicator, Modal, BackHandler, Platform,
+  StyleSheet, ActivityIndicator, Modal, BackHandler, Platform, Keyboard,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useNavigation } from "expo-router";
@@ -17,6 +17,18 @@ import { api } from "@/services/api";
 import PasswordChecks from "@/components/auth/PasswordChecks";
 
 WebBrowser.maybeCompleteAuthSession();
+
+function useKeyboardHeight() {
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const s1 = Keyboard.addListener(showEvent, (e) => setKbHeight(e.endCoordinates.height));
+    const s2 = Keyboard.addListener(hideEvent, () => setKbHeight(0));
+    return () => { s1.remove(); s2.remove(); };
+  }, []);
+  return kbHeight;
+}
 
 type ProfileView = "login" | "register" | "forgot-email" | "forgot-code" | "verify" | "profile" | "settings" | "google-register";
 
@@ -93,6 +105,8 @@ export default function ProfileTab() {
   const goToGoogleRegister = (data: typeof googleData) => { setGoogleData(data); setView("google-register"); };
   const goToForgot = () => { setView("forgot-email"); };
 
+  const kbHeight = useKeyboardHeight();
+
   return (
     <View style={s.container}>
       <StatusBar style="light" />
@@ -104,14 +118,11 @@ export default function ProfileTab() {
         </View>
       </View>
 
-      {/* Fix 2: automaticallyAdjustKeyboardInsets makes ScrollView scroll to focused input */}
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.bgGray }}
-        contentContainerStyle={s.content}
+        contentContainerStyle={[s.content, { paddingBottom: kbHeight > 0 ? kbHeight + 40 : 20 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        automaticallyAdjustKeyboardInsets={true}
       >
         {view === "login" && <LoginSection onSwitchRegister={() => setView("register")} onSwitchForgot={goToForgot} onNeedsVerify={goToVerify} onGoogleRegister={goToGoogleRegister} />}
         {view === "register" && <RegisterSection onSwitchLogin={() => setView("login")} onNeedsVerify={goToVerify} onGoogleRegister={goToGoogleRegister} />}
