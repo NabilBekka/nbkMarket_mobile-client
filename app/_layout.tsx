@@ -6,7 +6,7 @@ export default function RootLayout() {
   return (
     <LangProvider>
       <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false, gestureEnabled: false, animation: "none" }} />
       </AuthProvider>
     </LangProvider>
   );
